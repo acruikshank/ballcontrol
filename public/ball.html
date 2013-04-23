@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Ball Control</title>
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<style>
+			html { height: 100%; }
+			body { background: black; position: relative; height: 100%; margin: 0; }
+			.level { position: absolute; top: 0; width: 10%; height: 90%;}
+			.level-contents { position: absolute; top: 0; height: 0%; left: 0%; width: 100%;}
+			#level0 { left: 5%; }
+			#level1 { left: 38%; }
+			#level2 { left: 71%; }
+			.touch-slider { position: absolute; top: 0; width: 15%; height: 90%; background: #222; }
+			#touch-slider0 { left:18%; }
+			#touch-slider1 { left:51%; }
+			#touch-slider2 { left:84%; }
+			#touch-thumb0, #touch-thumb1, #touch-thumb2 { 
+				-webkit-transition: top .2s ease;
+				position: absolute; top: 50%; left: 0%; width: 100%; height: 10%; border-radius: 200px; background: black; 
+				box-shadow: inset 3px 3px 10px rgba(255,255,255,.5);
+			}
+			#touch-thumb0.dragging,#touch-thumb1.dragging,#touch-thumb2.dragging {
+				-webkit-transition: top 0;
+			}			
+			.touch-thumb-inner { 
+				position: absolute; top: 15%; width: 70%; height: 70%; left: 15%; border-radius: 200px; 
+				box-shadow: inset -3px -3px 10px rgba(255,255,255,.5);
+			}
+			.colors { position:absolute; bottom:0; left: 0; width: 100%; height: 10%; margin:0; padding:0 0 0 1%; }
+			.colors div { display: inline-block; width: 16%; height: 100%; opacity: .25; margin: 0 2px 0 0; }
+			.colors div.selected { opacity: 1; }
+			#state1 { background-color: red; }
+			#state2 { background-color: orange; }
+			#state3 { background-color: yellow; }
+			#state4 { background-color: green; }
+			#state5 { background-color: blue; }
+			#state6 { background-color: white; }
+		</style>
+	</head>
+	<body>
+		<div id="level0" class="level"><div id="level-contents0" class="level-contents"></div></div>
+		<div id="touch-slider0" class="touch-slider">
+			<div id="touch-thumb0" class="dragging">
+				<div class="touch-thumb-inner">
+				</div>
+			</div>
+		</div>
+
+		<div id="level1" class="level"><div id="level-contents1" class="level-contents"></div></div>
+		<div id="touch-slider1" class="touch-slider">
+			<div id="touch-thumb1" class="dragging">
+				<div class="touch-thumb-inner">
+				</div>
+			</div>
+		</div>
+
+		<div id="level2" class="level"><div id="level-contents2" class="level-contents"></div></div>
+		<div id="touch-slider2" class="touch-slider">
+			<div id="touch-thumb2" class="dragging">
+				<div class="touch-thumb-inner">
+				</div>
+			</div>
+		</div>
+		<div class="colors">
+			<div id="state1"></div>
+			<div id="state2"></div>
+			<div id="state3"></div>
+			<div id="state4"></div>
+			<div id="state5"></div>
+			<div id="state6"></div>
+		</div>
+	</body>
+	<foot>
+		<script>
+			function el(id) {return document.getElementById(id)}
+
+			for (var i=0; i<3; i++) {
+				el('touch-thumb'+i).style.top = (50 - 10/2) + '%';
+
+				el('touch-slider'+i).addEventListener('touchstart', start, false)
+				el('touch-slider'+i).addEventListener('touchmove', move, false)
+				el('touch-slider'+i).addEventListener('touchend', finish, false)
+			}
+			document.body.addEventListener('touchstart', noDefault, false)
+
+			for (var i=1; i<7; i++)
+				el('state'+i).addEventListener('touchend', stateChange, false)
+
+			function elementIndex(element) {
+				if (element.getAttribute('class') == 'touch-slider')
+					return parseInt(element.id.match(/\d+/)[0]);
+				return elementIndex(element.parentElement);
+			}
+
+			function noDefault(event) {
+				event.preventDefault();
+			}
+			
+			function start(event) {
+				event.preventDefault();
+				el('touch-thumb'+elementIndex(event.target)).setAttribute('class', 'dragging')
+				move(event);
+			}
+
+			function move(event) {
+				event.preventDefault();
+				var index = elementIndex(event.target);
+				var value = Math.max(-1, Math.min( 1, 1.05-(event.targetTouches[0].pageY / document.body.offsetHeight) / .45 ) );
+				el('touch-thumb'+index).style.top = (45 - 45*value) + '%';
+
+				if ( value > 0 ) {
+					el('level-contents'+index).style.top = (50 - 50*value)+'%';
+					el('level-contents'+index).style.height = (50*value)+'%';
+					el('level-contents'+index).style.backgroundColor = 'rgb('+parseInt(55+200*value)+',0,0)';
+				} else {
+					el('level-contents'+index).style.top = '50%';
+					el('level-contents'+index).style.height = (-50*value)+'%';					
+					el('level-contents'+index).style.backgroundColor = 'rgb(0,0,' + parseInt(55-200*value)+')';
+				}
+
+				socket.send(JSON.stringify({motor:index, power:value}))
+			}
+
+			function finish(event) {
+				event.preventDefault();
+				var index = elementIndex(event.target);
+				el('touch-thumb'+index).setAttribute('class', '')
+				el('touch-thumb'+index).style.top = (50 - 10/2) + '%';
+				el('level-contents'+index).style.top = '50%';
+				el('level-contents'+index).style.height = '0%';
+
+				socket.send(JSON.stringify({motor:index, power:0}))
+			}
+
+			function stateChange(event) {
+				event.preventDefault();
+				var nextState;
+				if ( event.target.getAttribute('class') == 'selected' )
+					nextState = 0;
+				else
+					nextState = parseInt(event.target.id.match(/\d+/)[0])
+
+				for (var i=1; i<7; i++)
+					el('state'+i).setAttribute('class','');
+
+				if (nextState)
+					el('state'+nextState).setAttribute('class','selected');
+
+				socket.send(JSON.stringify({state:nextState}));
+			}
+
+			var socket = new WebSocket('ws://' + location.hostname + ':9322/');
+
+		</script>
+	</foot>
+</html>
+
