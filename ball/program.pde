@@ -23,7 +23,7 @@ class CalibrationProgram implements Program {
 	int motor = 0;
 	Hardware hardware;
 	ArrayList<BaselineProgram> programs = new ArrayList<BaselineProgram>();
-  ArrayList<Vector2f> eyeBolts = new ArrayList<Vector2f>(3);
+  ArrayList<Pt> eyeBolts = new ArrayList<Pt>(3);
 	BaselineProgram currentProgram = null;
 	float ceiling = 0;
 	int cooldown = 0;
@@ -42,19 +42,13 @@ class CalibrationProgram implements Program {
   	if (motor > 2) {
 			for (int i=0; i<3; i++) {
 				ceiling += programs.get(i).ceiling;
-				eyeBolts.add( programs.get((i+1)%3).baseline.intersection(programs.get((i+2)%3).baseline) );
+				eyeBolts.add( programs.get((i+1)%3).baseline.intersectionXY(programs.get((i+2)%3).baseline) );
 			}			
 			ceiling /= 3.0;
 
-			Vector2f test = new Vector2f(eyeBolts.get(0));
-			test.sub(eyeBolts.get(1));
-			println("Eyebolt length 1: " + test.length());
-			test = new Vector2f(eyeBolts.get(1));
-			test.sub(eyeBolts.get(2));
-			println("Eyebolt length 2: " + test.length());
-			test = new Vector2f(eyeBolts.get(2));
-			test.sub(eyeBolts.get(0));
-			println("Eyebolt length 3: " + test.length());
+			println("Eyebolt length 1: " + new Line(eyeBolts.get(0),eyeBolts.get(1)).length());
+			println("Eyebolt length 2: " +  new Line(eyeBolts.get(1),eyeBolts.get(2)).length());
+			println("Eyebolt length 3: " +  new Line(eyeBolts.get(2),eyeBolts.get(0)).length());
   		return true;
   	}
 
@@ -75,23 +69,23 @@ class BaselineProgram implements Program {
   int LINE_SAMPLES = 5;
 
   int motor = 0;
-  Sphere origin = null;
+  Pt origin = null;
   Hardware hardware;
   Program current = null;
 	ArrayList<Sphere> measurements = new ArrayList<Sphere>();
-	ArrayList<Sphere> translated = new ArrayList<Sphere>();
+	ArrayList<Pt> translated = new ArrayList<Pt>();
   int state = 0;
   int stepCountdown = 5;
   float ax = 0;
   float az = 0;
   float theta = 0;
-  Vector2f pointA;
-  Vector2f pointB;
-  Vector2f midpoint;
-  Vector2f arcCenter;
-  ArrayList<Vector2f> middle;
+  Pt pointA;
+  Pt pointB;
+  Pt midpoint;
+  Pt arcCenter;
+  ArrayList<Pt> middle;
   Line bisector2;
-  Vector2f center;
+  Pt center;
   float r = 0;
   Line baseline;
   float ceiling = 0;
@@ -103,18 +97,18 @@ class BaselineProgram implements Program {
   	current = new DistanceProgram( 400, motor, 1, hardware );
 	}
 
-  boolean step( Sphere position ) {
+  boolean step( Sphere measurement ) {
   	if ( origin == null )
-  		origin = position;
+  		origin = measurement.position;
 
   	switch (state) {
   		case 0:
-		    measurements.add(position);
-		    if ( current.step( position ) )
+		    measurements.add(measurement);
+		    if ( current.step( measurement ) )
     			state = 1;
     		break;
     	case 1:
-    		measurements.add(position);
+    		measurements.add(measurement);
     		if (stepCountdown-- < 1) {
 	    		computeXZAngle();
   	  		current = new ReturnProgram( origin, motor, 0, hardware );
@@ -122,7 +116,7 @@ class BaselineProgram implements Program {
     		}
     		break;
     	case 2:
-		    if ( current.step( position ) ) {
+		    if ( current.step( measurement ) ) {
     			state = 3;
     			return true;
     		}
@@ -137,12 +131,16 @@ class BaselineProgram implements Program {
   	for (int i=0; i < 2*LINE_SAMPLES; i++)
   		samples.add( measurements.get(int(i%2 == 0 ? random(0,count/2) :random(count/2,count))) );
 
+    // Expect projection onto xz plane to be a line.
+    // Analyze samples to find average angle, theta.
   	ax = az = 0;
   	for (int i=0; i < 2*LINE_SAMPLES; i++) {
+      Pt current = samples.get(i).position;
+      Pt next = samples.get((i+1)%(2*LINE_SAMPLES)).position;
   		int sign = (i%2 == 0 ? -1 : 1);
-  		float x = samples.get(i).x - samples.get((i+1)%(2*LINE_SAMPLES)).x;
-  		float z = samples.get(i).z - samples.get((i+1)%(2*LINE_SAMPLES)).z;
-  		float m = (float) Math.sqrt(x*x + z*z);
+  		float x = current.x - next.x;
+  		float z = current.z - next.z;
+  		float m = sqrt(x*x + z*z);
   		ax += sign * x * m;
   		az += sign * z * m;
   		weight += m;
@@ -151,25 +149,35 @@ class BaselineProgram implements Program {
   	az /= weight;
   	theta = atan2(az,ax);
 
-  	for ( Sphere m : measurements )
-  		translated.add( m.rotateXZ(-theta) );
+    float averageZ = 0;
+  	for ( Sphere m : measurements ) {
+      Pt t = m.position.rotateXZ(-theta);
+  		translated.add( t );
+      averageZ += t.z;
+    }
+    averageZ /= translated.size();
 
   	println("WEIGHT: " + weight);
   	println("THETA: " + theta);
   	println("AX: " + ax);
   	println("AZ: " + az);
+    println("AVERAGE Z: " + averageZ);
 
-  	ArrayList<Vector2f> xys = new ArrayList<Vector2f>(translated.size());
-  	float averageZ = 0;
-  	for ( Sphere t : translated ) {
-  		xys.add( new Vector2f(t.x, t.y) );
-  		averageZ += t.z;
-  	}
-  	averageZ /= translated.size();
+    // Points have now been rotated onto a plane orthogonal to the z axis.
+    // We expect the points to lie on an arc of a circle on this plane.
+    // Compute the midpoint, M, of the line connecting the two ends of the
+    // arc, AB. Let a be the distance from one end of the arc to M, and b
+    // be the distance from the center of the arc, C, to M (note that point C
+    // will lie on the bisection of AB). The radius of the circle is given 
+    // by r=(a^2+b^2)/2b and the center of the circle lies on the line CM at 
+    // a distance r from C.
 
-
-  	pointA = averagePoints( xys.subList(0,3) );
-  	pointB = averagePoints( xys.subList(xys.size()-3,xys.size()) );
+    // This algorithm works, but it is very sensitive to measurement error
+    // of locations of the points at the center of the arc. It also discards
+    // the information from all points not at the center or ends. A
+    // least-squares approach would work better here.
+  	pointA = averagePointsXY( translated.subList(0,3), averageZ );
+  	pointB = averagePointsXY( translated.subList(translated.size()-3,translated.size()), averageZ );
   	Line AB = new Line(pointA,pointB);
 
   	println("POINT A: " + pointA.x + " "  + pointA.y);
@@ -177,21 +185,23 @@ class BaselineProgram implements Program {
   	println("AB Length: " + AB.length());
   	midpoint = AB.midpoint();
 
-  	final Line bisector = new Line(pointA,pointB).bisect();
+  	final Line bisector = new Line(pointA,pointB).bisectXY();
   	println("BISECT start: " + bisector.start.x + " " + bisector.start.y);
   	println("BISECT end: " + bisector.end.x + " " + bisector.end.y);
-  	Collections.sort(xys, new Comparator<Vector2f> () {
-  		public int compare(Vector2f a, Vector2f b) {
+
+    // sort translated to find points nearest the midpoint bisector
+  	Collections.sort(translated, new Comparator<Pt> () {
+  		public int compare(Pt a, Pt b) {
   			float diff = bisector.projectDistance(a) - bisector.projectDistance(b);
   			if (diff == 0) return 0;
   			return diff < 0 ? -1 : 1;
   		}
   	});
 
-  	middle = new ArrayList<Vector2f>(3);
+  	middle = new ArrayList<Pt>(3);
   	for (int i=0; i<3; i++)
-  		middle.add( bisector.projectOnto(xys.get(i)) );
-  	arcCenter = averagePoints(middle);
+  		middle.add( bisector.projectOnto(translated.get(i)) );
+  	arcCenter = averagePointsXY(middle, averageZ);
 
   	Line MC = new Line(arcCenter, midpoint);
   	println("MC Length: " + MC.length());
@@ -200,53 +210,21 @@ class BaselineProgram implements Program {
   	float mcDist = MC.length();
   	r = (abDist*abDist/4.0 + mcDist*mcDist) / (2*mcDist);
 
-  	center = MC.fromOrigin().end;
-  	center.normalize();
-  	center.scale(r);
-  	center.add(arcCenter);
+    center = MC.extend(r).end;
   	println("CENTER: " + center.x + " " + center.y);
   	println("RADIUS: " + r);
 
-  	baseline = new Line(new Vector2f(center.x,averageZ), new Vector2f(center.x,averageZ + 1)).rotate(theta);
-  	ceiling = center.y;
-
-  	/*
-  	Working with translated:
-  	Line fit first 5 point, find closest point on line to point 0 and call it A.
-  	Line fit last 5 points, find closest point it to last point and call it B.
-  	Find midpoint on AB, M, and the normal from it Mn (assume Mn points away from the circle center).
-  	Find the closest 5 points to the right of Mn, and line fit them to line Cr.
-		Find the closest 5 points to the left of Mn and line fit them to the line Cl.
-		Find the average  of the intersections of Cr with Mn and Cl with Mn. Call it C.
-		r = (|AB|^2 + |CM|^2) / (2|CM|)
-		center =  C - r|Mn|
-		baseLine = (center, center + ((center-C) x AB))
-  	*/
+  	baseline = new Line(center, center.add(new Pt(0,0,1)) ).rotateXZ(theta);
   }
 
-  Vector2f averagePoints( List<Vector2f> points) {
-  	Vector2f average = new Vector2f(0,0);
-  	for (Vector2f point : points) {
-  		println( "Adding: " + point.x + " to " + average.x);
-  		average.add(point);
-  	}
-  	average.scale( 1.0 / points.size() );
-  	println( "after scale: " + average.x);
-  	return average;
+  Pt averagePointsXY( List<Pt> points, float z) {
+  	Pt average = new Pt(0,0,0);
+  	for (Pt point : points)
+  		average = average.add(point);
+  	average = average.scale( 1.0 / points.size() );
+    average.z = z;
+    return average;
   }
-
-  /* given 5 points ordered along the line, find */
-  /*
-  Vector3f lineFit5( ArrayList<Vector3f> points ) {
-  	int[] indices = {2,3,1,4,0,3,1,2};
-  	Vector3f line = Vector3f(0,0,0);
-  	for (int index=0; index < indices.length - 1; index++) {
-  		Vector3f next = points.get(index+1).sub(points.get(index));
-  		line.add( next.scale( (i%2==0?1:-1) * next.length() ) );
-  	}
-  	return line.normalize();
-  }
-  */
 }
 
 
@@ -258,7 +236,7 @@ abstract class SingleAxisMotionProgram implements Program {
   float EASE_OFFSET = .5;
   float EASE_START = .75;
 
-  Sphere lastPosition = new Sphere(0,0,0,0);
+  Pt lastPosition = new Pt(0,0,0);
   Date lastMeasurement = null;
   int motorPower = 0;
 
@@ -272,7 +250,7 @@ abstract class SingleAxisMotionProgram implements Program {
   	this.hardware = hardware;
   }
 
-  void move( float fraction, Sphere position ) {
+  void move( float fraction, Pt position ) {
     if ( lastMeasurement == null ) {
       lastPosition = position;
       lastMeasurement = new Date();
@@ -298,7 +276,7 @@ abstract class SingleAxisMotionProgram implements Program {
 }
 
 class DistanceProgram extends SingleAxisMotionProgram {
-  Sphere origin = null;
+  Pt origin = null;
   float goal = 0;
   
   DistanceProgram( float goal, int motor, int direction, Hardware hardware ) {
@@ -307,18 +285,18 @@ class DistanceProgram extends SingleAxisMotionProgram {
     this.goal = goal;
   }
   
-  boolean step( Sphere position ) {
+  boolean step( Sphere measurement ) {
   	if ( origin == null )
-  		origin = position;
+  		origin = measurement.position;
 
-    float totalDistance = position.distance(origin);
+    float totalDistance = measurement.position.distance(origin);
     if ( totalDistance >= goal) {
       hardware.sendCommand( motor, 0, 0 );
       println("End move");
       return true;
     }
 
-    move( totalDistance / goal, position );
+    move( totalDistance / goal, measurement.position );
     return false;
   }
 }
@@ -326,27 +304,27 @@ class DistanceProgram extends SingleAxisMotionProgram {
 class ReturnProgram extends SingleAxisMotionProgram {
   float TOLERANCE = 50;
 
-  Sphere origin = null;
-  Sphere destination = null;
+  Pt origin = null;
+  Pt destination = null;
 
-  ReturnProgram( Sphere destination, int motor, int direction, Hardware hardware ) {
+  ReturnProgram( Pt destination, int motor, int direction, Hardware hardware ) {
   	super( motor, direction, hardware );
     println("Moving " + motor + " to origin");
     this.destination = destination;
   }
   
-  boolean step( Sphere position ) {
+  boolean step( Sphere measurement ) {
   	if ( origin == null )
-  		origin = position;
+  		origin = measurement.position;
 
-    float totalDistance = position.distance(destination);
+    float totalDistance = measurement.position.distance(destination);
     if ( totalDistance <= TOLERANCE) {
       hardware.sendCommand( motor, 0, 0 );
       println("End move");
       return true;
     }
 
-    move( 1 - totalDistance / origin.distance(destination), position );
+    move( 1 - totalDistance / origin.distance(destination), measurement.position );
     return false;
   }
 }

@@ -112,7 +112,7 @@ void renderBall(Sphere ball) {
   float mRadius = 10;
   
   fill(255);
-  ellipse(ball.x,ball.y,ball.r,ball.r);
+  ellipse(ball.position.x,ball.position.y,ball.r,ball.r);
   stroke(255,0,0);
 //  for (ScanLine scanLine : scanLines)
 //    line(scanLine.startX, scanLine.y, scanLine.endX, scanLine.y );
@@ -123,7 +123,7 @@ void renderBall(Sphere ball) {
 
       fill(150,150,200);
       for ( Sphere measurement : baselineProgram.measurements )
-        ellipse(measurement.x,measurement.y,mRadius,mRadius);
+        ellipse(measurement.position.x,measurement.position.y,mRadius,mRadius);
 
       if ( baselineProgram.translated.size() > 0 ) {
         pushMatrix();
@@ -135,11 +135,11 @@ void renderBall(Sphere ball) {
         fill(150,150,255);
         ellipse(baselineProgram.midpoint.x-offset,baselineProgram.midpoint.y,2*mRadius,2*mRadius);
         ellipse(baselineProgram.arcCenter.x-offset,baselineProgram.arcCenter.y,2*mRadius,2*mRadius);
-        for ( Vector2f measurement : baselineProgram.middle )
+        for ( Pt measurement : baselineProgram.middle )
           ellipse(measurement.x-offset,measurement.y,mRadius,mRadius);
 
         fill(255,150,150);
-        for ( Sphere measurement : baselineProgram.translated )
+        for ( Pt measurement : baselineProgram.translated )
           ellipse(measurement.x-offset,measurement.y,mRadius,mRadius);
 
         noFill();
@@ -160,13 +160,13 @@ void renderBall(Sphere ball) {
   translate(width/2, 360);
   scale(s,-s);
   fill(255);
-  ellipse(Z_OFFSET-ball.z,ball.y,ball.r,ball.r);
+  ellipse(Z_OFFSET-ball.position.z,ball.position.y,ball.r,ball.r);
   
   if ( calibrationProgram != null ) {
     for (BaselineProgram baselineProgram : calibrationProgram.programs) {
       fill(150,150,200);
       for ( Sphere measurement : baselineProgram.measurements )
-        ellipse(Z_OFFSET-measurement.z,measurement.y,mRadius,mRadius);
+        ellipse(Z_OFFSET-measurement.position.z,measurement.position.y,mRadius,mRadius);
       /*
       if ( baselineProgram.translated.size() > 0 ) {
         float offset = baselineProgram.translated.get(0).z;
@@ -186,18 +186,18 @@ void renderBall(Sphere ball) {
   scale(.4*s,-.4*s);
 
   fill(255);
-  ellipse(ball.x,Z_OFFSET-ball.z,ball.r,ball.r);
+  ellipse(ball.position.x,Z_OFFSET-ball.position.z,ball.r,ball.r);
   if ( calibrationProgram != null ) {
     for (BaselineProgram baselineProgram : calibrationProgram.programs) {
       stroke(100,100,100);
       fill(150,150,200);
       for ( Sphere measurement : baselineProgram.measurements )
-        ellipse(measurement.x,Z_OFFSET-measurement.z,mRadius,mRadius);
+        ellipse(measurement.position.x,Z_OFFSET-measurement.position.z,mRadius,mRadius);
       if ( baselineProgram.translated.size() > 0 ) {
         float offset = baselineProgram.translated.get(0).x;
         fill(255,150,150);
-        for ( Sphere translated : baselineProgram.translated ) {
-          Sphere measurement = translated.rotateXZ(baselineProgram.theta);
+        for ( Pt translated : baselineProgram.translated ) {
+          Pt measurement = translated.rotateXZ(baselineProgram.theta);
           ellipse(measurement.x,Z_OFFSET-measurement.z,mRadius,mRadius);
         }
       }
@@ -205,7 +205,7 @@ void renderBall(Sphere ball) {
       if ( baselineProgram.measurements.size() > 0 ) {
         stroke(255,150,150);
         Sphere start = baselineProgram.measurements.get(0);
-        line( start.x, Z_OFFSET-start.z, start.x + 5*baselineProgram.ax, Z_OFFSET - start.z - 5*baselineProgram.az );
+        line( start.position.x, Z_OFFSET-start.position.z, start.position.x + 5*baselineProgram.ax, Z_OFFSET - start.position.z - 5*baselineProgram.az );
       }
 
       if ( baselineProgram.baseline != null ) {
@@ -221,15 +221,12 @@ void renderBall(Sphere ball) {
 
     fill(128);
     stroke(255,200,0);
-    for (Vector2f eyeBolt : calibrationProgram.eyeBolts) {
+    for (Pt eyeBolt : calibrationProgram.eyeBolts) {
       ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.y,2*mRadius,2*mRadius);
     }
   }
   popMatrix();
 
 }
-
-
-
 
 
