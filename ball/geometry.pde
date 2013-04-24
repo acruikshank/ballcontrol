@@ -42,20 +42,20 @@ class Line {
   Line scale( float scale ) { return new Line(start, ( (end .sub (start)).scale(scale) ) .add (start) ); }
 
   /*
-    Finds the intersection of the projections of two lines onto the XY plane.
-    The resulting point will be given the z value of this line's start.
+    Finds the intersection of the projections of two lines onto the XZ plane.
+    The resulting point will be given the y value of this line's start.
     If the projection of the two lines are parallel, this function returns null.
    */
-  Pt intersectionXY( Line other ) {
-    float x1=start.x,y1=start.y,x2=end.x,y2=end.y,
-          x3=other.start.x,y3=other.start.y,x4=other.end.x,y4=other.end.y;
-    float det = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+  Pt intersectionXZ( Line other ) {
+    float x1=start.x,z1=start.z,x2=end.x,z2=end.z,
+          x3=other.start.x,z3=other.start.z,x4=other.end.x,z4=other.end.z;
+    float det = (x1-x2)*(z3-z4) - (z1-z2)*(x3-x4);
     if ( det == 0 )
       return null;
     return new Pt( 
-      ((x1*y2 - y1*x2)*(x3-x4) - (x1-x2)*(x3*y4-y3*x4))/det,
-      ((x1*y2 - y1*x2)*(y3-y4) - (y1-y2)*(x3*y4-y3*x4))/det,
-      start.z
+      ((x1*z2 - z1*x2)*(x3-x4) - (x1-x2)*(x3*z4-z3*x4))/det,
+      start.y,
+      ((x1*z2 - z1*x2)*(z3-z4) - (z1-z2)*(x3*z4-z3*x4))/det
     );
   }
 

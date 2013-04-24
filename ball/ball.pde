@@ -212,9 +212,9 @@ void renderBall(Sphere ball) {
         stroke(255,200,0);
         strokeWeight(5);
         Line scaled = baselineProgram.baseline.scale(1000);
-        line( scaled.start.x, Z_OFFSET - scaled.start.y, scaled.end.x, Z_OFFSET - scaled.end.y );
+        line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
         scaled = baselineProgram.baseline.scale(-1000);
-        line( scaled.start.x, Z_OFFSET - scaled.start.y, scaled.end.x, Z_OFFSET - scaled.end.y );
+        line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
         strokeWeight(1);
       }
     }
@@ -222,7 +222,7 @@ void renderBall(Sphere ball) {
     fill(128);
     stroke(255,200,0);
     for (Pt eyeBolt : calibrationProgram.eyeBolts) {
-      ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.y,2*mRadius,2*mRadius);
+      ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.z,2*mRadius,2*mRadius);
     }
   }
   popMatrix();

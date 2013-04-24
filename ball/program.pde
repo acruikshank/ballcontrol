@@ -42,7 +42,7 @@ class CalibrationProgram implements Program {
   	if (motor > 2) {
 			for (int i=0; i<3; i++) {
 				ceiling += programs.get(i).ceiling;
-				eyeBolts.add( programs.get((i+1)%3).baseline.intersectionXY(programs.get((i+2)%3).baseline) );
+				eyeBolts.add( programs.get((i+1)%3).baseline.intersectionXZ(programs.get((i+2)%3).baseline) );
 			}			
 			ceiling /= 3.0;
 
