@@ -4,8 +4,12 @@ class Kinect {
 	float DEPTH_THRESHOLD = 500; 
 	
 	SimpleOpenNI context;
+	WindowContext depthWindow;
+  WindowContext measurementWindow;
 	
-	Kinect( PApplet parent ) {
+	Kinect( PApplet parent, WindowContext depthWindow, WindowContext measurementWindow ) {
+    this.depthWindow = depthWindow;
+    this.measurementWindow = measurementWindow;
 	  context = new SimpleOpenNI(parent);
 	  context.setMirror(false);
 
@@ -69,7 +73,7 @@ class Kinect {
 
 		  if (scanLine != null) {
 	  		if (group == null || ! group.test(scanLine))
-	  			groups.add(new ScanLineGroup(scanLine));
+	  			groups.add(group = new ScanLineGroup(scanLine));
 	  		else
 	    		group.add(scanLine);
 			}
@@ -101,18 +105,44 @@ class Kinect {
 	    cy /= weight;
 	    cx /= weight;
 	    cz /= weight;
-	          
+	   
 	    r = 0;
 	    for ( ScanLine line : scanLines ) {
 	      r += Math.sqrt(Math.pow(line.startX-cx,2) + Math.pow(line.y-cy,2));
 	      r += Math.sqrt(Math.pow(line.endX-cx,2) + Math.pow(line.y-cy,2));
 	    }
-	    r /= scanLines.size() * 2;
+	    r /= (scanLines.size() * 2);
 	    
 	    sphere = new Sphere(cx,cy,cz,r); 
 	  }
+
+	  if (depthWindow != null)
+	  	renderMeasurement(sphere,scanLines);
 	  
 	  return sphere;
+	}
+
+	void renderMeasurement(Sphere ball, ArrayList<ScanLine> scanLines) {
+    PGraphics context = depthWindow.beginContext();
+    context.image(kinect.depthImage(),0,0,depthWindow.width,depthWindow.width*3/4.0);
+    depthWindow.endContext();
+
+    float s = 2;
+    context = measurementWindow.beginContext();
+    context.pushMatrix();
+
+    context.translate(measurementWindow.width/2, measurementWindow.height/2);
+    context.scale(s,-s);
+  
+    context.fill(255);
+    context.noStroke();
+    context.ellipse(0,0,2*ball.r,2*ball.r);
+    context.stroke(225,75,25);
+    for (ScanLine scanLine : scanLines)
+      context.line(scanLine.startX - ball.position.x, scanLine.y - ball.position.y, scanLine.endX - ball.position.x, scanLine.y - ball.position.y );
+
+    context.popMatrix();
+    measurementWindow.endContext();
 	}
 }
 

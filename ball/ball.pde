@@ -10,6 +10,7 @@ String dataIn;
 String last = null;
 CalibrationProgram calibrationProgram = null;
 Program program = null;
+boolean drawInit = false;
 
 /* Steps
  convert to scala?
@@ -25,7 +26,7 @@ Program program = null;
  */
 
 void setup() { 
-  size(320,720);
+  size(1440,810);
   smooth();
 
   // Connect to the local machine at port 5204.
@@ -33,12 +34,24 @@ void setup() {
   // previously started a server on this port.
   myClient = new Client(this, "127.0.0.1", 5204);
   hardware = new Hardware(this);
-  kinect = new Kinect(this);
+  kinect = new Kinect(this, 
+    new WindowContext("Kinect Depth", 0, 0, 360, 270),
+    new WindowContext("Measurement", 0, 270, 360, 270)
+    );
+
+  frame.removeNotify();
+  frame.setUndecorated(false);
+  frame.addNotify();
 } 
 
 void draw() {
   int motor, p;
   float power;
+
+  if (! drawInit) {
+    frame.setLocation(0, 0);
+    drawInit = true;
+  }
   
   Sphere ball = kinect.locateBall();
 
@@ -95,11 +108,12 @@ void keyPressed() {
 
 void renderBall(Sphere ball) {
 
-  background(128,128,128);
+
+  /*
+  background(100);
   ellipseMode(RADIUS);
   stroke(100,100,100);
 
-  image(kinect.depthImage(),0,0,width,240);
   
   float s = .25;
   pushMatrix();
@@ -167,14 +181,12 @@ void renderBall(Sphere ball) {
       fill(150,150,200);
       for ( Sphere measurement : baselineProgram.measurements )
         ellipse(Z_OFFSET-measurement.position.z,measurement.position.y,mRadius,mRadius);
-      /*
-      if ( baselineProgram.translated.size() > 0 ) {
-        float offset = baselineProgram.translated.get(0).z;
-        fill(255,150,150);
-        for ( Sphere measurement : baselineProgram.translated )
-          ellipse(-measurement.z-offset,measurement.y,mRadius,mRadius);
-      }
-      */
+//      if ( baselineProgram.translated.size() > 0 ) {
+//        float offset = baselineProgram.translated.get(0).z;
+//        fill(255,150,150);
+//        for ( Sphere measurement : baselineProgram.translated )
+//          ellipse(-measurement.z-offset,measurement.y,mRadius,mRadius);
+//      }
     }
   }
 
@@ -226,7 +238,63 @@ void renderBall(Sphere ball) {
     }
   }
   popMatrix();
+  */
+}
 
+class WindowContext {
+  String title;
+  int x;
+  int y;
+  int width;
+  int height;
+  private PGraphics graphics;
+  private PGraphics parent;
+
+  WindowContext(String title, int x, int y, int width, int height) {
+    this(title,x,y,width,height,null);
+  }
+
+  WindowContext(String title, int x, int y, int width, int height, PGraphics parent) {
+    this.title = title;
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.parent = parent;
+    graphics = createGraphics(width, height);
+  }
+
+  PGraphics beginContext() {
+    graphics.beginDraw();
+    graphics.clear();
+    return graphics;
+  }
+
+  void endContext() {
+    graphics.endDraw();
+    if (parent != null) {
+      parent.fill(100);
+      parent.rect(x,y,width,height);
+      parent.image(graphics,x,y);
+      if (title != null) {
+        parent.fill(0,0,0,75);
+        parent.text(title, x + 11, y +21);
+        parent.fill(255,255,255,75);
+        parent.text(title, x + 10, y +20);
+      }
+    } else {
+      fill(100);
+      noStroke();
+      rect(x,y,width,height);
+      image(graphics,x,y);
+      if (title != null) {
+        fill(0,0,0,75);
+        text(title, x + 11, y +21);
+        fill(255,255,255,75);
+        text(title, x + 10, y +20);
+      }      
+    }
+  }
 }
 
 
