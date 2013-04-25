@@ -27,10 +27,23 @@ class CalibrationProgram implements Program {
 	BaselineProgram currentProgram = null;
 	float ceiling = 0;
 	int cooldown = 0;
+  WindowContext orthoXY;
+  WindowContext orthoYZ;
+  WindowContext orthoXZ;
+  WindowContext solution;
+  WindowContext mainWindow;
 
-  CalibrationProgram( Hardware hardware ) {
+  CalibrationProgram( Hardware hardware, WindowContext window ) {
   	this.hardware = hardware;
+    mainWindow = window;
   	currentProgram = new BaselineProgram( motor, hardware);
+
+    if (window != null) {
+      orthoXY = new WindowContext("Ortho XY", 0, 0, window.width/2, window.height/2, window);
+      orthoYZ = new WindowContext("Ortho YZ", window.width/2, 0, window.width/2, window.height/2, window);
+      orthoXZ = new WindowContext("Ortho XZ", 0, window.height/2, window.width/2, window.height/2, window);
+      solution = new WindowContext("Solution", window.width/2, window.height/2, window.width/2, window.height/2, window);
+    }
   }
 
   boolean step( Sphere position ) {
@@ -49,6 +62,10 @@ class CalibrationProgram implements Program {
 			println("Eyebolt length 1: " + new Line(eyeBolts.get(0),eyeBolts.get(1)).length());
 			println("Eyebolt length 2: " +  new Line(eyeBolts.get(1),eyeBolts.get(2)).length());
 			println("Eyebolt length 3: " +  new Line(eyeBolts.get(2),eyeBolts.get(0)).length());
+
+      if (mainWindow != null)
+        renderCalculations();
+
   		return true;
   	}
 
@@ -61,7 +78,156 @@ class CalibrationProgram implements Program {
   		currentProgram = null;
   		cooldown = 10;
   	}
+
+    if (mainWindow != null)
+      renderCalculations();
+
   	return false;
+  }
+
+  void renderCalculations() {
+    float s = .25;
+    float Z_OFFSET = 1200;
+
+    mainWindow.beginContext();
+    PGraphics xy = initGraph(orthoXY,s,true,true);
+    PGraphics yz = initGraph(orthoYZ,s,true,false);
+    PGraphics xz = initGraph(orthoXZ,s,false,true);
+    PGraphics sol = initGraph(solution,s/2,false,true);
+    
+    float mRadius = 10;
+
+    for (BaselineProgram baselineProgram : calibrationProgram.programs) {
+
+      xy.fill(150,150,200);
+      yz.fill(150,150,200);
+      xz.fill(150,150,200);
+      for ( Sphere measurement : baselineProgram.measurements ) {
+        xy.ellipse(measurement.position.x,measurement.position.y,mRadius,mRadius);
+        yz.ellipse(Z_OFFSET-measurement.position.z,measurement.position.y,mRadius,mRadius);
+        xz.ellipse(measurement.position.x,Z_OFFSET-measurement.position.z,mRadius,mRadius);
+      }
+
+      if ( baselineProgram.translated.size() > 0 ) {
+
+
+        float offset = baselineProgram.translated.get(0).x;
+        xy.fill(150,255,150);
+        xy.ellipse(baselineProgram.pointA.x-offset,baselineProgram.pointA.y,2*mRadius,2*mRadius);      
+        xy.ellipse(baselineProgram.pointB.x-offset,baselineProgram.pointB.y,2*mRadius,2*mRadius);      
+
+        xy.fill(150,150,255);
+        xy.ellipse(baselineProgram.midpoint.x-offset,baselineProgram.midpoint.y,2*mRadius,2*mRadius);
+        xy.ellipse(baselineProgram.arcCenter.x-offset,baselineProgram.arcCenter.y,2*mRadius,2*mRadius);
+        for ( Pt measurement : baselineProgram.middle )
+          xy.ellipse(measurement.x-offset,measurement.y,mRadius,mRadius);
+
+        xy.fill(255,150,150);
+        for ( Pt measurement : baselineProgram.translated )
+          xy.ellipse(measurement.x-offset,measurement.y,mRadius,mRadius);
+
+        xy.noFill();
+        xy.stroke(255,255,100);
+        xy.line(baselineProgram.arcCenter.x-offset,baselineProgram.arcCenter.y,baselineProgram.center.x-offset,baselineProgram.center.y);
+        xy.ellipse(baselineProgram.center.x-offset,baselineProgram.center.y,baselineProgram.r,baselineProgram.r);
+        xy.stroke(100,100,100);
+      }
+
+      if ( baselineProgram.baseline != null ) {
+        sol.stroke(255,255,100);
+        sol.strokeWeight(5);
+        Line scaled = baselineProgram.baseline.scale(10000);
+        sol.line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
+        scaled = baselineProgram.baseline.scale(-10000);
+        sol.line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
+        sol.strokeWeight(1);
+      }
+
+    }
+  
+    for (Pt eyeBolt : calibrationProgram.eyeBolts) {
+      sol.fill(100);
+      sol.stroke(255,255,0);
+      sol.strokeWeight(2);
+      sol.ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.z,2*mRadius,2*mRadius);
+    }
+
+    xy.popMatrix();
+    yz.popMatrix();
+    xz.popMatrix();
+    sol.popMatrix();
+    orthoXY.endContext();
+    orthoYZ.endContext();
+    orthoXZ.endContext();
+    solution.endContext();
+    mainWindow.endContext();
+
+    /*
+
+
+    pushMatrix();
+    line(160,480,160,720);  
+    translate(width/2, 600);
+    scale(.4*s,-.4*s);
+
+    fill(255);
+    ellipse(ball.position.x,Z_OFFSET-ball.position.z,ball.r,ball.r);
+    if ( calibrationProgram != null ) {
+      for (BaselineProgram baselineProgram : calibrationProgram.programs) {
+        stroke(100,100,100);
+        fill(150,150,200);
+        for ( Sphere measurement : baselineProgram.measurements )
+          ellipse(measurement.position.x,Z_OFFSET-measurement.position.z,mRadius,mRadius);
+        if ( baselineProgram.translated.size() > 0 ) {
+          float offset = baselineProgram.translated.get(0).x;
+          fill(255,150,150);
+          for ( Pt translated : baselineProgram.translated ) {
+            Pt measurement = translated.rotateXZ(baselineProgram.theta);
+            ellipse(measurement.x,Z_OFFSET-measurement.z,mRadius,mRadius);
+          }
+        }
+
+        if ( baselineProgram.measurements.size() > 0 ) {
+          stroke(255,150,150);
+          Sphere start = baselineProgram.measurements.get(0);
+          line( start.position.x, Z_OFFSET-start.position.z, start.position.x + 5*baselineProgram.ax, Z_OFFSET - start.position.z - 5*baselineProgram.az );
+        }
+
+        if ( baselineProgram.baseline != null ) {
+          stroke(255,200,0);
+          strokeWeight(5);
+          Line scaled = baselineProgram.baseline.scale(1000);
+          line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
+          scaled = baselineProgram.baseline.scale(-1000);
+          line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
+          strokeWeight(1);
+        }
+      }
+
+      fill(128);
+      stroke(255,200,0);
+      for (Pt eyeBolt : calibrationProgram.eyeBolts) {
+        ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.z,2*mRadius,2*mRadius);
+      }
+    }
+    popMatrix();
+  */
+  }
+
+  PGraphics initGraph( WindowContext window, float scale, boolean xaxis, boolean yaxis ) {
+    PGraphics context = window.beginContext();
+    context.ellipseMode(RADIUS);
+    context.stroke(75);
+
+    context.pushMatrix();
+    if (xaxis)
+      context.line(0,window.height/2,window.width,window.height/2);
+    if (yaxis)
+      context.line(orthoYZ.width/2,0,orthoYZ.width/2,orthoYZ.height);
+    
+    context.translate(window.width/2, window.height/2);
+    context.scale(scale,-scale);
+    return context;
   }
 }
 
@@ -267,7 +433,7 @@ abstract class SingleAxisMotionProgram implements Program {
       motorPower = max(0,min(255,motorPower + MOTOR_INCREMENT));
       hardware.sendCommand( motor, direction, motorPower );
     }
-    println( fraction + " " + expectedVelocity + " " + velocity + " " + motorPower );
+//    println( fraction + " " + expectedVelocity + " " + velocity + " " + motorPower );
     
     lastPosition = position;
     lastMeasurement = new Date();
