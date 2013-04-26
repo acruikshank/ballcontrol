@@ -59,10 +59,6 @@ class CalibrationProgram implements Program {
 			}			
 			ceiling /= 3.0;
 
-			println("Eyebolt length 1: " + new Line(eyeBolts.get(0),eyeBolts.get(1)).length());
-			println("Eyebolt length 2: " +  new Line(eyeBolts.get(1),eyeBolts.get(2)).length());
-			println("Eyebolt length 3: " +  new Line(eyeBolts.get(2),eyeBolts.get(0)).length());
-
       if (mainWindow != null)
         renderCalculations();
 
@@ -90,12 +86,26 @@ class CalibrationProgram implements Program {
     float Z_OFFSET = 1200;
 
     mainWindow.beginContext();
-    PGraphics xy = initGraph(orthoXY,s,true,true);
-    PGraphics yz = initGraph(orthoYZ,s,true,false);
-    PGraphics xz = initGraph(orthoXZ,s,false,true);
-    PGraphics sol = initGraph(solution,s/2,false,true);
+    PGraphics xy = orthoXY.beginContext();
+    initGraph(orthoXY, xy,s,true,true);
+    PGraphics yz = orthoYZ.beginContext();
+    initGraph(orthoYZ, yz,s,true,false);
+    PGraphics xz = orthoXZ.beginContext();
+    initGraph(orthoXZ, xz,s,false,true);
+    PGraphics sol = solution.beginContext();
     
     float mRadius = 10;
+
+    if (eyeBolts.size() == 3) {
+      solution.writeLine( String.format("Eyebolt 1 x:%7.1f    y:%7.1f    z:%7.1f", eyeBolts.get(0).x, eyeBolts.get(0).y, eyeBolts.get(0).z  ) );
+      solution.writeLine( String.format("Eyebolt 2 x:%7.1f    y:%7.1f    z:%7.1f", eyeBolts.get(1).x, eyeBolts.get(1).y, eyeBolts.get(1).z  ) );
+      solution.writeLine( String.format("Eyebolt 3 x:%7.1f    y:%7.1f    z:%7.1f", eyeBolts.get(2).x, eyeBolts.get(2).y, eyeBolts.get(2).z  ) );
+      solution.writeLine( String.format("Baseline 1-2 Length: %8.1f", new Line(eyeBolts.get(0),eyeBolts.get(1)).length() ) );
+      solution.writeLine( String.format("Baseline 2-3 Length: %8.1f", new Line(eyeBolts.get(1),eyeBolts.get(2)).length() ) );
+      solution.writeLine( String.format("Baseline 3-1 Length: %8.1f", new Line(eyeBolts.get(2),eyeBolts.get(0)).length() ) );
+    }
+
+    initGraph(solution, sol,s/2,false,true);
 
     for (BaselineProgram baselineProgram : calibrationProgram.programs) {
 
@@ -162,60 +172,9 @@ class CalibrationProgram implements Program {
     solution.endContext();
     mainWindow.endContext();
 
-    /*
-
-
-    pushMatrix();
-    line(160,480,160,720);  
-    translate(width/2, 600);
-    scale(.4*s,-.4*s);
-
-    fill(255);
-    ellipse(ball.position.x,Z_OFFSET-ball.position.z,ball.r,ball.r);
-    if ( calibrationProgram != null ) {
-      for (BaselineProgram baselineProgram : calibrationProgram.programs) {
-        stroke(100,100,100);
-        fill(150,150,200);
-        for ( Sphere measurement : baselineProgram.measurements )
-          ellipse(measurement.position.x,Z_OFFSET-measurement.position.z,mRadius,mRadius);
-        if ( baselineProgram.translated.size() > 0 ) {
-          float offset = baselineProgram.translated.get(0).x;
-          fill(255,150,150);
-          for ( Pt translated : baselineProgram.translated ) {
-            Pt measurement = translated.rotateXZ(baselineProgram.theta);
-            ellipse(measurement.x,Z_OFFSET-measurement.z,mRadius,mRadius);
-          }
-        }
-
-        if ( baselineProgram.measurements.size() > 0 ) {
-          stroke(255,150,150);
-          Sphere start = baselineProgram.measurements.get(0);
-          line( start.position.x, Z_OFFSET-start.position.z, start.position.x + 5*baselineProgram.ax, Z_OFFSET - start.position.z - 5*baselineProgram.az );
-        }
-
-        if ( baselineProgram.baseline != null ) {
-          stroke(255,200,0);
-          strokeWeight(5);
-          Line scaled = baselineProgram.baseline.scale(1000);
-          line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
-          scaled = baselineProgram.baseline.scale(-1000);
-          line( scaled.start.x, Z_OFFSET - scaled.start.z, scaled.end.x, Z_OFFSET - scaled.end.z );
-          strokeWeight(1);
-        }
-      }
-
-      fill(128);
-      stroke(255,200,0);
-      for (Pt eyeBolt : calibrationProgram.eyeBolts) {
-        ellipse(eyeBolt.x,Z_OFFSET-eyeBolt.z,2*mRadius,2*mRadius);
-      }
-    }
-    popMatrix();
-  */
   }
 
-  PGraphics initGraph( WindowContext window, float scale, boolean xaxis, boolean yaxis ) {
-    PGraphics context = window.beginContext();
+  void initGraph( WindowContext window, PGraphics context, float scale, boolean xaxis, boolean yaxis ) {
     context.ellipseMode(RADIUS);
     context.stroke(75);
 
@@ -227,7 +186,6 @@ class CalibrationProgram implements Program {
     
     context.translate(window.width/2, window.height/2);
     context.scale(scale,-scale);
-    return context;
   }
 }
 
