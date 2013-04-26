@@ -10,6 +10,8 @@ CalibrationProgram calibrationProgram = null;
 Program program = null;
 boolean drawInit = false;
 WindowContext primaryContext;
+PFont bfont;
+PFont font;
 
 /* Steps
  convert to scala?
@@ -36,13 +38,17 @@ void setup() {
   hardware = new Hardware(this);
   kinect = new Kinect(this, 
     new WindowContext("Kinect Depth", 0, 0, 360, 270),
-    new WindowContext("Measurement", 0, 270, 360, 270)
+    new WindowContext("Measurement", 0, 270, 360, 270),
+    new WindowContext("Results", 0, 540, 360, 270)
     );
   primaryContext = new WindowContext(null,360,0,1080,810);
 
   frame.removeNotify();
   frame.setUndecorated(false);
   frame.addNotify();
+
+  font = createFont("Andale Mono", 14);
+  bfont = createFont("Helvetica-Bold", 14);
 } 
 
 void draw() {
@@ -106,11 +112,17 @@ void keyPressed() {
 }
 
 class WindowContext {
+  int LEFT_HEADER_MARGIN = 10;
+  int TOP_TEXT_MARGIN = 55;
+  int LEFT_TEXT_MARGIN = 20;
+  int LEADING = 30;
   String title;
   int x;
   int y;
   int width;
   int height;
+  int textTop = TOP_TEXT_MARGIN;
+  int textLeft = LEFT_TEXT_MARGIN;
   PGraphics graphics;
   private WindowContext parent;
 
@@ -131,32 +143,49 @@ class WindowContext {
   PGraphics beginContext() {
     graphics.beginDraw();
     graphics.clear();
+    textTop = TOP_TEXT_MARGIN;
+    textLeft = LEFT_TEXT_MARGIN;
     return graphics;
+  }
+
+  void writeLine(String text) {
+    graphics.textFont(font,14);
+    graphics.noStroke();
+    graphics.fill(230);
+    graphics.text( text, textLeft, textTop );
+    textTop += LEADING;
+  }
+
+  void offsetText( int x, int y ) {
+    textTop += y;
+    textLeft += x;
   }
 
   void endContext() {
     graphics.endDraw();
     if (parent != null) {
+      parent.graphics.textFont(bfont,14);
       parent.graphics.fill(100);
       parent.graphics.noStroke();
       parent.graphics.rect(x,y,width,height);
       parent.graphics.image(graphics,x,y);
       if (title != null) {
         parent.graphics.fill(0,0,0,75);
-        parent.graphics.text(title, x + 11, y +21);
+        parent.graphics.text(title, x + LEFT_HEADER_MARGIN+1, y +21);
         parent.graphics.fill(255,255,255,75);
-        parent.graphics.text(title, x + 10, y +20);
+        parent.graphics.text(title, x + LEFT_HEADER_MARGIN, y +20);
       }
     } else {
+      textFont(bfont,14);
       fill(100);
       noStroke();
       rect(x,y,width,height);
       image(graphics,x,y);
       if (title != null) {
         fill(0,0,0,75);
-        text(title, x + 11, y +21);
+        text(title, x + LEFT_HEADER_MARGIN+1, y +21);
         fill(255,255,255,75);
-        text(title, x + 10, y +20);
+        text(title, x + LEFT_HEADER_MARGIN, y +20);
       }      
     }
   }
