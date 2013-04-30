@@ -16,44 +16,50 @@
 		return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
 	}
 
-  var cx = (20*Math.random() - 10)|0;
-  var cy = (20*Math.random() - 10)|0;
-  var r = (80 + 40*Math.random())|0;
+  function runExperiment() {
+    ctx.clearRect(-canvas.width/2,-canvas.height/2,canvas.width,canvas.height);
+    var cx = (200*Math.random() - 100)|0;
+    var cy = (200*Math.random() - 100)|0;
+    var r = (40 + 40*Math.random())|0;
 
-  var minTheta = 2*Math.PI * Math.random();
-  var thetaRange = Math.PI/5 + Math.PI/2*Math.random();
+    var minTheta = 2*Math.PI * Math.random();
+    var thetaRange = Math.PI/5 + Math.PI/2*Math.random();
 
-  var pointN = 30;
-  var points = [];
-  var pointStd = .03;
-  for (var i=0; i<pointN; i++) {
-    var theta = minTheta + Math.random()*thetaRange;
-    points.push({
-      x: cx + r*Math.cos(theta) + randomGausian()*pointStd,
-      y: cy + r*Math.sin(theta) + randomGausian()*pointStd
-    })
+    var pointN = 30;
+    var points = [];
+    var pointStd = 1;
+    for (var i=0; i<pointN; i++) {
+      var theta = minTheta + Math.random()*thetaRange;
+      points.push({
+        x: cx + r*Math.cos(theta) + randomGausian()*pointStd,
+        y: cy + r*Math.sin(theta) + randomGausian()*pointStd
+      })
+    }
+
+
+    var gdIterations = 300;
+    var gdRate = .015;
+    var gdEstimates = [{r:50, cx:0, cy:0}];
+
+    for (var i=0; i<gdIterations; i++)
+      gdEstimates.push( gradientDescent(points,gdEstimates[gdEstimates.length-1],gdRate) );
+
+    for (var i=0, estimate; estimate = gdEstimates[i]; i++) {
+      ctx.strokeStyle = "rgba(255,100,0," + (.4*(1+i)/gdEstimates.length) + ")"
+      ctx.beginPath(), ctx.arc(estimate.cx,estimate.cy,estimate.r,0,2*Math.PI,true), ctx.stroke()
+    }
+
+    ctx.fillStyle = ctx.strokeStyle = "rgba(255,255,0,.5)";
+    ctx.lineWidth = .75;
+    ctx.beginPath(), ctx.arc(cx,cy,r,0,2*Math.PI,true), ctx.stroke();
+
+    ctx.fillStyle = "rgba(200,230,255,.8)";
+    for (var i=0,p; p = points[i]; i++)
+      ctx.beginPath(), ctx.arc(p.x,p.y,1,0,2*Math.PI,true), ctx.fill()
   }
 
-  ctx.fillStyle = ctx.strokeStyle = "rgba(255,255,0,.5)";
-  ctx.lineWidth = .75;
-  ctx.beginPath(), ctx.arc(cx,cy,r,0,2*Math.PI,true), ctx.stroke();
-
-  ctx.fillStyle = "rgba(200,230,255,.8)";
-  for (var i=0,p; p = points[i]; i++)
-    ctx.beginPath(), ctx.arc(p.x,p.y,1,0,2*Math.PI,true), ctx.fill()
-
-  var gdIterations = 2000;
-  var gdRate = .015;
-  var gdEstimates = [{r:100, cx:0, cy:0}];
-
-  for (var i=0; i<gdIterations; i++)
-    gdEstimates.push( gradientDescent(points,gdEstimates[gdEstimates.length-1],gdRate) );
-
-  for (var i=0, estimate; estimate = gdEstimates[i]; i++) {
-    ctx.strokeStyle = "rgba(255,100,0," + (.4*(1+i)/gdEstimates.length) + ")"
-    console.log(cost(points,estimate),estimate, cx, cy, r);
-    ctx.beginPath(), ctx.arc(estimate.cx,estimate.cy,estimate.r,0,2*Math.PI,true), ctx.stroke()
-  }
+  runExperiment();
+  setInterval(runExperiment,3000);
 
   function gradientDescent(samples, estimate, rate) {
     var next = {r:estimate.r, cx:estimate.cx, cy:estimate.cy};

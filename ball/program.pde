@@ -335,8 +335,15 @@ class BaselineProgram implements Program {
   	r = (abDist*abDist/4.0 + mcDist*mcDist) / (2*mcDist);
 
     center = MC.extend(r).end;
+
+    List<CircleEstimate> estimates = gradientDescent(translated, new CircleEstimate(center.x, center.y,r), 500, .003);
+    for (CircleEstimate estimate: estimates)
+      println(String.format("estimate x: %6.1f  y: %6.1f  r: %6.1f     mse: %2.4f", estimate.x, estimate.y, estimate.r, meanSquareError(translated,estimate) ));
+
+    CircleEstimate bestGuess = estimates.get(estimates.size()-1);
+    center = new Pt(bestGuess.x, bestGuess.y, center.z);
   	println("CENTER: " + center.x + " " + center.y);
-  	println("RADIUS: " + r);
+  	println("RADIUS: " + bestGuess.r);
 
   	baseline = new Line(center, center.add(new Pt(0,0,1)) ).rotateXZ(theta);
   }
@@ -348,6 +355,49 @@ class BaselineProgram implements Program {
   	average = average.scale( 1.0 / points.size() );
     average.z = z;
     return average;
+  }
+
+  List<CircleEstimate> gradientDescent(List<Pt> samples, CircleEstimate estimate, int iterations, float rate) {    
+    List<CircleEstimate> estimates = new ArrayList<CircleEstimate>();
+    estimates.add(estimate);
+    for (int i=0; i<iterations; i++) {
+      float x = estimate.x, y = estimate.y, r = estimate.r;
+      for (Pt sample : samples) {
+        float dx = estimate.x - sample.x, 
+              dy = estimate.y - sample.y, 
+              distance = (float) Math.sqrt(dx*dx+dy*dy),
+              error = estimate.r - distance;
+        x += rate * 2*dx*error / distance;
+        y += rate * 2*dy*error / distance;
+        r -= rate*2*error;
+      }
+      estimate = new CircleEstimate(x,y,r);
+      estimates.add(estimate);
+    }
+    return estimates;
+  }
+
+  float meanSquareError(List<Pt> samples, CircleEstimate estimate) {
+    float cost = 0;
+    for (Pt sample : samples) {
+      float dx = estimate.x - sample.x, 
+          dy = estimate.y - sample.y, 
+          distance = (float) Math.sqrt(dx*dx+dy*dy),
+          error = estimate.r - distance;
+      cost += error*error;
+    }
+    return cost / samples.size();
+  }
+
+  class CircleEstimate {
+    float x;
+    float y;
+    float r;
+    CircleEstimate(float x, float y, float r) {
+      this.x = x;
+      this.y = y;
+      this.r = r;
+    }
   }
 }
 
