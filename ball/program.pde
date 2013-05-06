@@ -6,20 +6,38 @@ interface Program {
   boolean step( Sphere position );
 }
 
+float MEASURED_CEILING_Y = 711;
+
 /*
-  CONTROL TEST
-  // wait until we have a position on ball (lastLocation != null)
-  // mark origin
-  // set a goal of r amount of movement from origin
-  // each good measurement later
-  //   store position
-  //   calculate velocity as change in position over time since last good measurement
-  //   expected speed = min( max speed, (goal - distance so far) / ease factor )
-  //   if velocity < expected speed - tolerance, step up power to motor
-  //   if velocity > expected speed + tolerance, step down power to motor
-  //   if distance so far > goal, power to motor is 0, stop control test
+  CALIBRATION
+  The goal is to determine the location of each of the eyebolts using measurements
+  of the ball's path when only one motor is activated. Geometry tells us this path
+  will be a circle centered on and orthogonal to the line between the two eybolts
+  opposite of the eyebolt through with the current motor's cord is passing.
+
+  Since we don't yet have any knowlege of the boundaries of the experiment, take
+  a conservative approach of slowly increasing power to one of the motors until
+  we detect movement in the ball. Try to maintain this velocity until the ball has
+  traveled up a small distance. Then reverse the direction and move the ball until
+  it is sufficiently close to its origin. Use the upward path measurements to
+  determine the center.
+
+  We start by rotating the measurements onto the xy plane estimating the center of 
+  the circle geometrically, then use gradient descent to minimize the mean squared 
+  error. It turns out that we can't get consistent results if we try to simultaneously
+  solve for the x and y of the center and the radius, so we start by callibrating the
+  Kinect so that its yz plane is parallel to the ceiling and then measuring the y
+  distance between its sensor and the y value of an eyebolt (i.e. a little less than
+  the vertical distance between the sensor and the ceiling). Once we have the xy
+  coordinates of the center we rotate it back onto its original plane and take its
+  normal to create a line.
+
+  Repeating this procedure for all three motors gives us three lines and the
+  intersections of these lines are our estimates for the eyebolt locations in
+  the Kinect's 3D coordinates.
 */
 class CalibrationProgram implements Program {
+
 	int motor = 0;
 	Hardware hardware;
 	ArrayList<BaselineProgram> programs = new ArrayList<BaselineProgram>();
@@ -336,7 +354,10 @@ class BaselineProgram implements Program {
 
     center = MC.extend(r).end;
 
+    /*
     List<CircleEstimate> estimates = gradientDescent(translated, new CircleEstimate(center.x, center.y,r), 500, .003);
+    */
+    List<CircleEstimate> estimates = gradientDescentWithFixedY(translated, new CircleEstimate(center.x, MEASURED_CEILING_Y, r), 500, .003);
     for (CircleEstimate estimate: estimates)
       println(String.format("estimate x: %6.1f  y: %6.1f  r: %6.1f     mse: %2.4f", estimate.x, estimate.y, estimate.r, meanSquareError(translated,estimate) ));
 
@@ -369,6 +390,25 @@ class BaselineProgram implements Program {
               error = estimate.r - distance;
         x += rate * 2*dx*error / distance;
         y += rate * 2*dy*error / distance;
+        r -= rate*2*error;
+      }
+      estimate = new CircleEstimate(x,y,r);
+      estimates.add(estimate);
+    }
+    return estimates;
+  }
+
+  List<CircleEstimate> gradientDescentWithFixedY(List<Pt> samples, CircleEstimate estimate, int iterations, float rate) {    
+    List<CircleEstimate> estimates = new ArrayList<CircleEstimate>();
+    estimates.add(estimate);
+    for (int i=0; i<iterations; i++) {
+      float x = estimate.x, y = estimate.y, r = estimate.r;
+      for (Pt sample : samples) {
+        float dx = estimate.x - sample.x, 
+              dy = estimate.y - sample.y, 
+              distance = (float) Math.sqrt(dx*dx+dy*dy),
+              error = estimate.r - distance;
+        x += rate * 2*dx*error / distance;
         r -= rate*2*error;
       }
       estimate = new CircleEstimate(x,y,r);
